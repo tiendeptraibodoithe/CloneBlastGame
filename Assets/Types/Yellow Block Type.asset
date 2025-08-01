@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b61161f4e4304e46b9fc9519a0262c2, type: 3}
+  m_Name: Yellow Block Type
+  m_EditorClassIdentifier: 
+  typeName: YellowBlock
+  color: {r: 0.8962264, g: 0.74077374, b: 0, a: 0}
+  prefab: {fileID: 2719563656484941343, guid: f18f8a49c0f3693409a488849c2f0adb, type: 3}

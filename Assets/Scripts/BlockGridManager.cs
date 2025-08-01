@@ -1,0 +1,100 @@
+﻿using UnityEngine;
+using System.Collections.Generic;
+
+public class BlockGridManager : GridManager
+{
+    [Header("Block Types")]
+    public List<BlockType> blockTypes;
+    public Transform[,] grid;
+
+    private void Awake()
+    {
+        grid = new Transform[width, height]; // Khởi tạo lưới
+    }
+
+    public void ClearCell(int x, int y)
+    {
+        if (IsValid(x, y))
+        {
+            grid[x, y] = null;
+        }
+    }
+
+    public void MoveObject(int fromX, int fromY, int toX, int toY)
+    {
+        if (!IsValid(fromX, fromY) || !IsValid(toX, toY)) return;
+        Transform obj = grid[fromX, fromY];
+        if (obj != null)
+        {
+            grid[toX, toY] = obj;
+            grid[fromX, fromY] = null;
+            obj.transform.position = GetWorldPosition(toX, toY);
+        }
+    }
+
+    public Transform GetObjectAt(int x, int y)
+    {
+        if (IsValid(x, y))
+            return grid[x, y];
+        return null;
+    }
+
+    private bool IsValid(int x, int y)
+    {
+        return x >= 0 && x < width && y >= 0 && y < height;
+    }
+
+    public override Vector3 GetWorldPosition(int x, int y)
+    {
+        float offsetX = -(width - 1) / 2f;
+        float offsetZ = -(height - 1) / 2f;
+        return new Vector3(x + offsetX, 0, y + offsetZ); // mặt phẳng XZ
+    }
+
+    public void SpawnBlock(int x, int y, BlockType type)
+    {
+        GameObject block = Instantiate(type.prefab, GetWorldPosition(x, y), Quaternion.identity);
+        Block blockComponent = block.GetComponent<Block>();
+        blockComponent.blockColor = type.color;
+        blockComponent.floor = type.startingFloor; // nếu bạn có sàn khởi điểm
+        PlaceObject(x, y, block.transform);
+    }
+
+    public void PlaceObject(int x, int y, Transform obj)
+    {
+        if (IsValid(x, y))
+        {
+            grid[x, y] = obj;
+        }
+    }
+
+    public void DropColumnDown(int x, int destroyedY)
+    {
+        // Di chuyển tất cả blocks phía trên vị trí bị phá huỷ xuống dưới
+        for (int y = destroyedY + 1; y < height; y++)
+        {
+            Transform above = GetObjectAt(x, y);
+            if (above != null)
+            {
+                // Di chuyển block xuống vị trí trống
+                MoveObject(x, y, x, y - 1);
+            }
+        }
+
+        // Tiếp tục kiểm tra và di chuyển cho đến khi không còn khoảng trống
+        bool hasGaps = true;
+        while (hasGaps)
+        {
+            hasGaps = false;
+            for (int y = 0; y < height - 1; y++)
+            {
+                if (GetObjectAt(x, y) == null && GetObjectAt(x, y + 1) != null)
+                {
+                    // Có khoảng trống, di chuyển block xuống
+                    MoveObject(x, y + 1, x, y);
+                    hasGaps = true;
+                }
+            }
+        }
+    }
+}
