@@ -1,44 +1,81 @@
 ﻿using UnityEngine;
+using System.Collections.Generic;
 
 public class Block : MonoBehaviour
 {
-    public Color blockColor; // Màu sắc của block
+    public Color blockColor;
     public int floor = 3;
+    public GameObject subBlockPrefab; // Gán trong prefab
+    private List<GameObject> subBlocks = new List<GameObject>();
+    public float spacing = 0.2f;
 
-    // Thay đổi màu sắc (tuỳ chọn)
+    private bool isBeingHit = false;
+
     void Start()
     {
-        GetComponent<Renderer>().material.color = blockColor;
+        GenerateSubBlocks();
     }
 
-    // Xử lý khi bị bắn trúng
+    void GenerateSubBlocks()
+    {
+        float currentHeight = 0f;
+        for (int i = 0; i < floor; i++)
+        {
+            GameObject sub = Instantiate(subBlockPrefab, transform);
+            sub.transform.localPosition = new Vector3(0, currentHeight, 0);
+            currentHeight += 0.5f + spacing; // Chiều cao block + khoảng cách
+
+            Renderer r = sub.GetComponent<Renderer>();
+            if (r != null)
+            {
+                r.material.color = blockColor;
+            }
+            subBlocks.Add(sub);
+        }
+    }
+
     public void Hit()
     {
         floor--;
         Debug.Log($"Block hit! Floor remaining: {floor}");
-
-        // QUAN TRỌNG: Không destroy object ở đây
-        // Để AutoFire() tự xử lý việc destroy
-
-        // Có thể thêm hiệu ứng visual khi floor giảm
         UpdateVisual();
+    }
+
+    public bool TryHit()
+    {
+        if (isBeingHit || floor <= 0) return false;
+
+        isBeingHit = true;
+
+        if (floor > 0)
+        {
+            floor--;
+            Debug.Log($"Block hit safely! Floor remaining: {floor}");
+
+            UpdateVisual();
+
+            isBeingHit = false;
+            return true;
+        }
+
+        isBeingHit = false;
+        return false;
     }
 
     private void UpdateVisual()
     {
-        // Tuỳ chọn: Thay đổi màu sắc dựa trên floor còn lại
-        var renderer = GetComponent<Renderer>();
-        if (renderer != null)
+        if (floor >= 0 && floor < subBlocks.Count)
         {
-            Color color = blockColor;
-            // Làm mờ dần khi floor giảm
-            color.a = Mathf.Max(0.3f, (float)floor / 3f);
-            renderer.material.color = color;
+            // Huỷ tầng trên cùng còn lại
+            GameObject top = subBlocks[floor];
+            if (top != null)
+            {
+                Destroy(top);
+            }
         }
     }
 
-    public bool ShouldDestroy()
-    {
-        return floor <= 0;
-    }
+    public bool IsDestroyed => floor <= 0;
+    public bool IsBeingProcessed => isBeingHit;
+    public bool ShouldDestroy() => floor <= 0;
 }

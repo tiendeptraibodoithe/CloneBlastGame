@@ -13,5 +13,7 @@ MonoBehaviour:
   m_Name: Blue Block Type
   m_EditorClassIdentifier: 
   typeName: BlueBlock
+  subBlockPrefab: {fileID: 5259073311928491718, guid: e93cfaec8b564564ba623cbee3fb78a2, type: 3}
   color: {r: 0, g: 0.4174893, b: 1, a: 0}
-  prefab: {fileID: 2719563656484941343, guid: f18f8a49c0f3693409a488849c2f0adb, type: 3}
+  prefab: {fileID: 48372237805140085, guid: e86eb7cd1a346594c84a321bcfc3ff0c, type: 3}
+  startingFloor: 3

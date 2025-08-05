@@ -1,21 +1,22 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
-using System.Collections; // Thêm namespace này để sử dụng IEnumerator
+using System.Collections;
 using TMPro;
+using Unity.VisualScripting;
 
 public class Shooter : MonoBehaviour
 {
-    public Color shooterColor; // Màu sắc của shooter
+    public Color shooterColor;
     public ShooterType shooterType;
     public int ammo = 20;
-    public float shotDelay = 0.2f; // Thêm biến delay giữa các phát đạn
+    public float shotDelay = 0.05f; // Delay rất ngắn giữa các viên trong burst
+    public float burstDelay = 0.3f; // Delay giữa các burst
     private bool isFiring = false;
     public GameController gameController;
     [SerializeField] public TextMeshProUGUI ammoText;
     public GameObject bulletPrefab;
     public Transform firePoint;
 
-    // Thay đổi màu sắc (tuỳ chọn)
     void Start()
     {
         GetComponent<Renderer>().material.color = shooterColor;
@@ -24,7 +25,6 @@ public class Shooter : MonoBehaviour
         {
             ammoText = textObj.GetComponent<TextMeshProUGUI>();
         }
-
         UpdateAmmoText();
     }
 
@@ -41,42 +41,88 @@ public class Shooter : MonoBehaviour
 
     public void AutoFire(BlockGridManager blockGrid)
     {
-        if (!isFiring)
+        if (!isFiring && ammo > 0)
         {
-            StartCoroutine(AutoFireCoroutine(blockGrid));
+            StartCoroutine(BurstFireCoroutine(blockGrid));
         }
     }
 
-    private IEnumerator AutoFireCoroutine(BlockGridManager blockGrid)
+    private IEnumerator BurstFireCoroutine(BlockGridManager blockGrid)
     {
         isFiring = true;
-        Debug.Log($"AutoFire started! Ammo: {ammo}, Shooter Color: {shooterColor}");
+        Debug.Log($"Burst fire started! Ammo: {ammo}, Shooter Color: {shooterColor}");
 
+        while (ammo > 0)
+        {
+            // Tìm block đầu tiên từ trái qua phải
+            Block currentTarget = FindNextTarget(blockGrid);
+
+            if (currentTarget == null)
+            {
+                Debug.Log("No more valid targets found");
+                break;
+            }
+
+            Debug.Log($"Found target block with {currentTarget.floor} floors. Firing burst!");
+
+            // Tính số đạn cần bắn cho block này
+            int bulletsNeeded = currentTarget.floor;
+            int bulletsToFire = Mathf.Min(bulletsNeeded, ammo);
+
+            // **BẮN BURST - tất cả đạn gần như cùng lúc**
+            yield return StartCoroutine(FireBurst(currentTarget, bulletsToFire));
+
+            // Chờ để tất cả đạn trong burst hit target
+            yield return new WaitForSeconds(burstDelay);
+
+            Debug.Log($"Burst completed. Ammo left: {ammo}");
+        }
+
+        isFiring = false;
+        Debug.Log($"Burst fire finished! Ammo left: {ammo}");
+    }
+
+    private IEnumerator FireBurst(Block target, int bulletCount)
+    {
+        Debug.Log($"Firing burst of {bulletCount} bullets!");
+
+        // Bắn tất cả đạn với delay rất ngắn
+        for (int i = 0; i < bulletCount; i++)
+        {
+            if (target == null || ammo <= 0 || target.floor <= 0) break;
+
+            FireBulletAtTarget(target);
+
+            // Delay rất ngắn giữa các viên đạn (tạo hiệu ứng burst)
+            if (i < bulletCount - 1) // Không delay sau viên đạn cuối
+            {
+                yield return new WaitForSeconds(shotDelay);
+            }
+        }
+    }
+
+    private Block FindNextTarget(BlockGridManager blockGrid)
+    {
         int width = blockGrid.width;
         int height = blockGrid.height;
 
-        // Tìm tất cả các block có cùng màu với shooter
-        List<Vector2Int> targetPositions = new List<Vector2Int>();
-
+        // Quét từ trái qua phải (x = 0 -> width-1)
         for (int x = 0; x < width; x++)
         {
-            // Tìm block đầu tiên (gần nhất với shooter) từ phía dưới lên trên
+            // Trong mỗi cột, tìm block đầu tiên từ dưới lên trên (y = 0 -> height-1)
             for (int y = 0; y < height; y++)
             {
-                Transform target = blockGrid.GetObjectAt(x, y);
-                if (target == null) continue;
+                Transform targetTransform = blockGrid.GetObjectAt(x, y);
+                if (targetTransform == null) continue;
 
-                Block block = target.GetComponent<Block>();
-                if (block != null)
+                Block block = targetTransform.GetComponent<Block>();
+                if (block != null && block.floor > 0)
                 {
-                    Debug.Log($"Found block at ({x},{y}) - Block Color: {block.blockColor}, Shooter Color: {shooterColor}");
-
-                    // Kiểm tra màu sắc có khớp không (với tolerance để tránh lỗi floating point)
+                    // Kiểm tra màu sắc có khớp không
                     if (ColorsMatch(block.blockColor, shooterColor))
                     {
-                        Debug.Log($"Color match! Adding target at ({x},{y})");
-                        targetPositions.Add(new Vector2Int(x, y));
-                        break; // Chỉ lấy block đầu tiên trong cột này
+                        Debug.Log($"Found target block at column {x}, row {y} with {block.floor} floors");
+                        return block; // Trả về block đầu tiên tìm thấy
                     }
                     else
                     {
@@ -87,97 +133,33 @@ public class Shooter : MonoBehaviour
             }
         }
 
-        Debug.Log($"Found {targetPositions.Count} target blocks with matching color");
+        return null; // Không tìm thấy target nào
+    }
 
-        // Bắn vào các block đã tìm thấy
-        foreach (Vector2Int pos in targetPositions)
+    private void FireBulletAtTarget(Block target)
+    {
+        if (target == null || target.floor <= 0 || ammo <= 0) return;
+
+        GameObject bulletObj = Instantiate(bulletPrefab, firePoint.position, Quaternion.identity);
+        Bullet bullet = bulletObj.GetComponent<Bullet>();
+        if (bullet != null)
         {
-            if (ammo <= 0) break;
-
-            Transform target = blockGrid.GetObjectAt(pos.x, pos.y);
-            if (target == null) continue;
-
-            Block block = target.GetComponent<Block>();
-            if (block == null) continue;
-
-            Debug.Log($"Shooting at block ({pos.x},{pos.y})");
-
-            // Bắn vào block này cho đến khi hết đạn hoặc block bị phá huỷ
-            while (ammo > 0 && block != null && block.floor > 0)
-            {
-                if (!ColorsMatch(block.blockColor, shooterColor))
-                {
-                    Debug.LogWarning($"Block at ({pos.x},{pos.y}) is different color! Skipping.");
-                    break;
-                }
-                Debug.Log($"Hitting block! Floor before: {block.floor}");
-                if (bulletPrefab != null)
-                {
-                    GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.identity);
-                    StartCoroutine(MoveBulletToTarget(bullet.transform, block.transform.position));
-                }
-                block.Hit();
-                ammo--;
-                UpdateAmmoText();
-                Debug.Log($"Floor after: {block.floor}, Ammo left: {ammo}");
-
-                if (block != null && block.gameObject != null && block.floor <= 0)
-                {
-                    Debug.Log($"Block destroyed at ({pos.x},{pos.y})!");
-
-                    blockGrid.ClearCell(pos.x, pos.y);
-                    Destroy(block.gameObject);
-
-                    // Cho các block phía trên rơi xuống
-                    blockGrid.DropColumnDown(pos.x, pos.y);
-                    isFiring = false;
-
-                    // 🔁 Kiểm tra lại tất cả các shooter đã chọn
-                    GameObject.FindObjectOfType<GameController>().RecheckAllSelectedShooters();
-
-                    // 🔄 Nếu còn đạn, tiếp tục bắn
-                    if (ammo > 0)
-                    {
-                        StartCoroutine(AutoFireCoroutine(blockGrid));
-                    }
-
-                    yield break; // Kết thúc coroutine hiện tại
-                }
-
-                // Thêm delay giữa các phát đạn
-                yield return new WaitForSeconds(shotDelay);
-
-                if (ammo <= 0)
-                {
-                    Debug.Log("Shooter has no ammo left. Destroying...");
-                    Destroy(gameObject);
-                    yield break;
-                }
-            }
+            bullet.Init(target, this);
+            Debug.Log($"Fired bullet at target with floor: {target.floor}");
         }
-        isFiring = false;
-        Debug.Log($"AutoFire finished! Ammo left: {ammo}");
+        else
+        {
+            // Nếu không có Bullet component, destroy object
+            Destroy(bulletObj);
+        }
     }
 
     private bool ColorsMatch(Color color1, Color color2)
     {
-        // So sánh màu với tolerance để tránh lỗi floating point
         float tolerance = 0.01f;
         return Mathf.Abs(color1.r - color2.r) < tolerance &&
                Mathf.Abs(color1.g - color2.g) < tolerance &&
                Mathf.Abs(color1.b - color2.b) < tolerance;
-    }
-
-    public void HitBlock()
-    {
-        ammo--;
-        UpdateAmmoText();
-
-        if (ammo <= 0)
-        {
-            Debug.Log("Shooter hết đạn!");
-            Destroy(gameObject);
-        }
     }
 
     private void UpdateAmmoText()
@@ -188,16 +170,17 @@ public class Shooter : MonoBehaviour
         }
     }
 
-    private IEnumerator MoveBulletToTarget(Transform bullet, Vector3 targetPos)
+    public void ReduceAmmo()
     {
-        float speed = 10f; // chỉnh tốc độ theo ý bạn
-        while (bullet != null && Vector3.Distance(bullet.position, targetPos) > 0.1f)
-        {
-            bullet.position = Vector3.MoveTowards(bullet.position, targetPos, speed * Time.deltaTime);
-            yield return null;
-        }
+        ammo--;
+        UpdateAmmoText();
 
-        // Khi tới nơi, có thể phá huỷ đạn
-        if (bullet != null) Destroy(bullet.gameObject);
+        if (ammo <= 0)
+        {
+            Debug.Log("Shooter hết đạn!");
+        }
     }
+
+    public bool IsOutOfAmmo => ammo <= 0;
+    public bool IsCurrentlyFiring => isFiring;
 }
