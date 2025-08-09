@@ -46,10 +46,10 @@ public class BlockGridManager : GridManager
 
     public override Vector3 GetWorldPosition(int x, int y)
     {
-        float offsetX = -(width - 1) / 2f;
-        float offsetZ = -(height - 1) / 2f;
-        return new Vector3(x + offsetX, 0, y + offsetZ); // mặt phẳng XZ
+        float xOffset = -(width * cellSize) / 2f + cellSize / 2f; // Căn giữa theo X
+        return new Vector3(x * cellSize + xOffset, 0, y * cellSize + zOffset);
     }
+
 
     public void SpawnBlock(int x, int y, BlockType type)
     {
@@ -109,4 +109,5 @@ public class BlockGridManager : GridManager
             }
         }
     }
+
 }
