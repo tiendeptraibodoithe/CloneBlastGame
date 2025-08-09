@@ -25,23 +25,32 @@
             grid[x, y] = null;
         }
 
-        // Move shooter object from one cell to another
-        public void MoveObject(int fromX, int fromY, int toX, int toY)
+    // Move shooter object from one cell to another
+    public void MoveObject(int fromX, int fromY, int toX, int toY)
+    {
+        Transform obj = GetObjectAt(fromX, fromY);
+        if (obj != null)
         {
-            Transform obj = GetObjectAt(fromX, fromY);
-            if (obj != null)
-            {
-                grid[toX, toY] = obj;
-                grid[fromX, fromY] = null;
-                obj.position = GetWorldPosition(toX, toY);
+            grid[toX, toY] = obj;
+            grid[fromX, fromY] = null;
+            obj.position = GetWorldPosition(toX, toY);
 
-                // Cập nhật thông tin vị trí nếu cần
-                var selector = obj.GetComponent<ShooterSelector>();
-                if (selector != null)
-                {
-                    selector.gridX = toX;
-                    selector.gridY = toY;
-                }
+            // Cập nhật thông tin vị trí nếu cần
+            var selector = obj.GetComponent<ShooterSelector>();
+            if (selector != null)
+            {
+                selector.gridX = toX;
+                selector.gridY = toY;
             }
         }
     }
+
+    public override Vector3 GetWorldPosition(int x, int y)
+    {
+        float xOffset = -(width * cellSize) / 2f + cellSize / 2f;  // Căn giữa theo X
+        float zStart = -10f; // Đặt shooter nằm dưới block
+        float z = zStart - y * cellSize; // Mở rộng xuống dưới
+        return new Vector3(x * cellSize + xOffset, 0, z);
+    }
+
+}

@@ -16,19 +16,19 @@ public class ShooterSelector : MonoBehaviour
 
     private void OnMouseDown()
     {
-        // Chỉ cho phép chọn shooter ở hàng trên cùng
-        if (gridY != gameController.shooterGrid.height - 1)
+        if (gridY != 0)
         {
             Debug.Log("Chỉ chọn shooter hàng đầu.");
             return;
         }
 
-        if (isSelected) return; // Ngăn chọn lại nếu đã bị chọn
-        isSelected = true;
+        if (isSelected) return;
 
-        GameController controller = GameObject.FindObjectOfType<GameController>();
-
-        gameController.OnShooterClicked(this);
+        // Gọi controller và chỉ đánh dấu selected nếu chọn thành công
+        if (gameController.OnShooterClicked(this))
+        {
+            isSelected = true;
+        }
     }
 }
 
