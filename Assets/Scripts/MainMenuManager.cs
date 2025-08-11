@@ -31,7 +31,7 @@ public class MainMenuManager : MonoBehaviour
     // Hàm bắt đầu game
     public void PlayGame()
     {
-        SceneManager.LoadScene("SampleScene");
+        SceneManager.LoadScene("Level1");
     }
 
     // Hiện menu cài đặt
