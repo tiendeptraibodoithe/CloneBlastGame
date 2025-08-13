@@ -125,10 +125,8 @@ public class GameController : MonoBehaviour
 
     public bool OnShooterClicked(ShooterSelector selector)
     {
-        // Làm sạch các shooter đã null hoặc bị destroy khỏi danh sách
         selectedShooters.RemoveAll(s => s == null || !s.activeSelf);
 
-        // Tìm slot đầu tiên còn trống
         int availableSlotIndex = -1;
         for (int i = 0; i < shooterSelectionSlots.Length; i++)
         {
@@ -145,7 +143,6 @@ public class GameController : MonoBehaviour
             return false;
         }
 
-        // Lấy thông tin shooter gốc
         Shooter originalShooter = selector.GetComponent<Shooter>();
         if (originalShooter == null)
         {
@@ -154,9 +151,8 @@ public class GameController : MonoBehaviour
         }
 
         // Kiểm tra shooter này có phải ở hàng cuối cùng không
-        // Xác định hàng "dưới cùng" dựa trên hướng sắp xếp thực tế
         bool isBottomRow = true;
-        for (int y = selector.gridY - 1; y >= 0; y--) // quét xuống thay vì lên
+        for (int y = selector.gridY - 1; y >= 0; y--)
         {
             if (shooterGrid.GetObjectAt(selector.gridX, y) != null)
             {
@@ -171,7 +167,7 @@ public class GameController : MonoBehaviour
             return false;
         }
 
-        Debug.Log($"Selecting shooter with color: {originalShooter.shooterColor}, type: {originalShooter.shooterType}, ammo: {originalShooter.ammo}");
+        Debug.Log($"Selecting shooter - Type: {originalShooter.shooterType.specialType}, Color: {originalShooter.shooterColor}, Ammo: {originalShooter.ammo}");
 
         GameObject shooterClone = Instantiate(selector.gameObject);
         shooterClone.transform.SetParent(shooterSelectionSlots[availableSlotIndex], worldPositionStays: false);
@@ -186,30 +182,31 @@ public class GameController : MonoBehaviour
         Shooter cloneShooter = shooterClone.GetComponent<Shooter>();
         if (cloneShooter != null)
         {
+            // Copy đầy đủ thông tin từ original
             cloneShooter.shooterColor = originalShooter.shooterColor;
             cloneShooter.shooterType = originalShooter.shooterType;
             cloneShooter.ammo = originalShooter.ammo;
+            cloneShooter.isRevealed = originalShooter.isRevealed;
             cloneShooter.gameController = this;
 
-            MeshRenderer mr = cloneShooter.GetComponent<MeshRenderer>();
-            if (mr != null)
-            {
-                mr.material.color = cloneShooter.shooterColor;
-            }
+            // Khởi tạo lại visuals cho clone
+            cloneShooter.SetType(originalShooter.shooterType);
 
-            Debug.Log($"Clone shooter created with color: {cloneShooter.shooterColor}, ammo: {cloneShooter.ammo}");
+            Debug.Log($"Clone shooter created - Type: {cloneShooter.shooterType.specialType}, Color: {cloneShooter.shooterColor}, Ammo: {cloneShooter.ammo}");
+
+            // Auto fire sẽ tự động reveal nếu là secret shooter
             cloneShooter.AutoFire(blockGrid);
         }
 
         selectedShooters.Add(shooterClone);
 
+        // Thử merge sau khi thêm shooter mới
         TryMergeSelectedShooters();
 
-        // Xóa shooter khỏi grid
+        // Xóa shooter khỏi grid và di chuyển các shooter phía dưới lên
         shooterGrid.ClearCell(selector.gridX, selector.gridY);
         Destroy(selector.gameObject);
 
-        // Di chuyển các shooter phía dưới lên
         for (int y = selector.gridY + 1; y < shooterGrid.height; y++)
         {
             Transform shooterBelow = shooterGrid.GetObjectAt(selector.gridX, y);
@@ -219,20 +216,31 @@ public class GameController : MonoBehaviour
             }
         }
 
-
         return true;
     }
 
+
     private void TryMergeSelectedShooters()
     {
-        // Cần ít nhất 3 shooter để kiểm tra
         if (selectedShooters.Count < 3)
             return;
 
-        // Nhóm các shooter theo màu
-        var colorGroups = selectedShooters
+        // Lọc ra những shooter có thể merge và đã được reveal
+        var mergeableShooters = selectedShooters
             .Where(s => s != null)
-            .GroupBy(s => s.GetComponent<Shooter>().shooterColor);
+            .Select(s => s.GetComponent<Shooter>())
+            .Where(shooter => shooter != null && shooter.shooterType.CanMerge())
+            .Where(shooter => !(shooter.IsSecretShooter && !shooter.isRevealed)) // Secret shooter phải được reveal
+            .ToList();
+
+        if (mergeableShooters.Count < 3)
+        {
+            Debug.Log("Không đủ shooter có thể merge hoặc chưa reveal");
+            return;
+        }
+
+        // Nhóm theo màu sắc
+        var colorGroups = mergeableShooters.GroupBy(s => s.shooterColor);
 
         foreach (var group in colorGroups)
         {
@@ -241,15 +249,19 @@ public class GameController : MonoBehaviour
             if (shootersOfColor.Count >= 3)
             {
                 // Lấy 3 shooter đầu tiên cùng màu
-                GameObject s1 = shootersOfColor[0];
-                GameObject s2 = shootersOfColor[1];
-                GameObject s3 = shootersOfColor[2];
+                Shooter s1 = shootersOfColor[0];
+                Shooter s2 = shootersOfColor[1];
+                Shooter s3 = shootersOfColor[2];
+
+                // Kiểm tra tất cả đều có thể merge
+                if (!s1.CanMergeWith(s2) || !s2.CanMergeWith(s3) || !s1.CanMergeWith(s3))
+                {
+                    Debug.Log("Một số shooter không thể merge với nhau");
+                    continue;
+                }
 
                 // Tính tổng ammo
-                int totalAmmo = s1.GetComponent<Shooter>().ammo +
-                                s2.GetComponent<Shooter>().ammo +
-                                s3.GetComponent<Shooter>().ammo;
-
+                int totalAmmo = s1.ammo + s2.ammo + s3.ammo;
                 Color mergedColor = group.Key;
 
                 // Tìm ShooterType hợp nhất tương ứng
@@ -262,9 +274,17 @@ public class GameController : MonoBehaviour
                     return;
                 }
 
-                // Lấy vị trí slot của shooter thứ 2 để spawn shooter hợp nhất tại đó
-                int middleIndex = shooterSelectionSlots
-                    .ToList().FindIndex(slot => slot.childCount > 0 && slot.GetChild(0).gameObject == s2);
+                // Tìm vị trí slot của shooter giữa
+                int middleIndex = -1;
+                for (int i = 0; i < shooterSelectionSlots.Length; i++)
+                {
+                    if (shooterSelectionSlots[i].childCount > 0 &&
+                        shooterSelectionSlots[i].GetChild(0).gameObject == s2.gameObject)
+                    {
+                        middleIndex = i;
+                        break;
+                    }
+                }
 
                 if (middleIndex == -1)
                 {
@@ -272,13 +292,13 @@ public class GameController : MonoBehaviour
                     return;
                 }
 
-                // Xoá 3 shooter cũ
-                Destroy(s1);
-                Destroy(s2);
-                Destroy(s3);
-                selectedShooters.Remove(s1);
-                selectedShooters.Remove(s2);
-                selectedShooters.Remove(s3);
+                // Xóa 3 shooter cũ
+                Destroy(s1.gameObject);
+                Destroy(s2.gameObject);
+                Destroy(s3.gameObject);
+                selectedShooters.Remove(s1.gameObject);
+                selectedShooters.Remove(s2.gameObject);
+                selectedShooters.Remove(s3.gameObject);
 
                 // Spawn shooter mới
                 GameObject mergedShooter = Instantiate(mergedType.prefab, shooterSelectionSlots[middleIndex]);
@@ -289,15 +309,12 @@ public class GameController : MonoBehaviour
                 shooterComponent.shooterType = mergedType;
                 shooterComponent.ammo = totalAmmo;
                 shooterComponent.gameController = this;
+                shooterComponent.isRevealed = true; // Merged shooter luôn được reveal
 
-                // Đặt màu nếu cần
-                MeshRenderer mr = mergedShooter.GetComponent<MeshRenderer>();
-                if (mr != null)
-                {
-                    mr.material.color = mergedColor;
-                }
+                // Set type để cập nhật visuals
+                shooterComponent.SetType(mergedType);
 
-                // Bắn
+                // Auto fire
                 shooterComponent.AutoFire(blockGrid);
 
                 // Thêm vào danh sách
@@ -309,8 +326,6 @@ public class GameController : MonoBehaviour
             }
         }
     }
-
-
 
 
     public void RecheckAllSelectedShooters()

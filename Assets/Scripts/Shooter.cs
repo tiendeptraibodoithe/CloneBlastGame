@@ -6,41 +6,190 @@ using Unity.VisualScripting;
 
 public class Shooter : MonoBehaviour
 {
+    [Header("Basic Properties")]
     public Color shooterColor;
     public ShooterType shooterType;
     public int ammo = 20;
-    public float shotDelay = 0.05f; // Delay rất ngắn giữa các viên trong burst
-    public float burstDelay = 0.3f; // Delay giữa các burst
+    public float shotDelay = 0.05f;
+    public float burstDelay = 0.3f;
+
+    [Header("Special Mechanics")]
+    public bool isRevealed = false; // Cho Secret Shooter
+
     private bool isFiring = false;
     public GameController gameController;
     [SerializeField] public TextMeshProUGUI ammoText;
     public GameObject bulletPrefab;
     public Transform firePoint;
 
+    // Visual components
+    private MeshRenderer meshRenderer;
+    private Material originalMaterial;
+    private Material hiddenMaterial;
+
     void Start()
     {
-        GetComponent<Renderer>().material.color = shooterColor;
+        InitializeVisuals();
+        CheckIfShouldReveal();
+        UpdateAmmoText();
+    }
+
+    private void InitializeVisuals()
+    {
+        meshRenderer = GetComponent<MeshRenderer>();
+
+        if (meshRenderer != null && shooterType != null)
+        {
+            // Tạo materials
+            originalMaterial = new Material(meshRenderer.material);
+            originalMaterial.color = shooterType.color;
+
+            hiddenMaterial = new Material(meshRenderer.material);
+            hiddenMaterial.color = shooterType.hiddenColor;
+
+            UpdateVisualAppearance();
+        }
+
+        // Find ammo text
         Transform textObj = transform.Find("Canvas/AmmoText");
         if (textObj != null)
         {
             ammoText = textObj.GetComponent<TextMeshProUGUI>();
         }
-        UpdateAmmoText();
+    }
+
+    private void CheckIfShouldReveal()
+    {
+        // Reveal secret shooter nếu ở hàng đầu tiên (y = 0)
+        if (shooterType != null && shooterType.specialType == ShooterSpecialType.Secret)
+        {
+            ShooterSelector selector = GetComponent<ShooterSelector>();
+            if (selector != null && selector.gridY == 0)
+            {
+                RevealSecretShooter();
+            }
+        }
     }
 
     public void SetType(ShooterType type)
     {
         shooterType = type;
         shooterColor = type.color;
-        var mr = GetComponent<MeshRenderer>();
-        if (mr != null)
+        ammo = type.GetActualAmmo();
+
+        // Khởi tạo lại materials với type mới
+        meshRenderer = GetComponent<MeshRenderer>();
+        if (meshRenderer != null)
         {
-            mr.material.color = type.color;
+            originalMaterial = new Material(meshRenderer.material);
+            originalMaterial.color = type.color;
+
+            hiddenMaterial = new Material(meshRenderer.material);
+            hiddenMaterial.color = type.hiddenColor;
+
+            UpdateVisualAppearance();
         }
+
+        // Kiểm tra xem có cần reveal không (cho trường hợp spawn)
+        CheckIfShouldReveal();
+        UpdateAmmoText();
+    }
+
+    private void UpdateVisualAppearance()
+    {
+        if (shooterType == null || meshRenderer == null) return;
+
+        Color displayColor = shooterType.GetDisplayColor(isRevealed);
+
+        // Cập nhật màu sắc
+        if (shooterType.specialType == ShooterSpecialType.Secret && !isRevealed)
+        {
+            meshRenderer.material = hiddenMaterial;
+        }
+        else
+        {
+            meshRenderer.material = originalMaterial;
+            meshRenderer.material.color = displayColor;
+        }
+
+        // Thêm visual effects cho Double Shooter
+        if (shooterType.specialType == ShooterSpecialType.Double)
+        {
+            AddDoubleShooterEffects();
+        }
+    }
+
+    private void AddDoubleShooterEffects()
+    {
+
+        // Thêm glow effect nếu có shader hỗ trợ
+        if (meshRenderer.material.HasProperty("_EmissionColor"))
+        {
+            meshRenderer.material.EnableKeyword("_EMISSION");
+            meshRenderer.material.SetColor("_EmissionColor", shooterType.doubleShooterColor * 0.3f);
+        }
+    }
+
+    public void RevealSecretShooter()
+    {
+        if (shooterType.specialType == ShooterSpecialType.Secret && !isRevealed)
+        {
+            isRevealed = true;
+            UpdateVisualAppearance();
+            UpdateAmmoText();
+
+            // Hiệu ứng reveal
+            StartCoroutine(RevealEffect());
+        }
+    }
+
+    private IEnumerator RevealEffect()
+    {
+        // Kiểm tra meshRenderer trước khi sử dụng
+        if (meshRenderer == null)
+        {
+            Debug.LogWarning("MeshRenderer is null, skipping reveal effect");
+            yield break;
+        }
+
+        // Hiệu ứng flash khi reveal
+        float flashDuration = 0.3f;
+        Color originalColor = meshRenderer.material.color;
+
+        for (int i = 0; i < 3; i++)
+        {
+            if (meshRenderer != null && meshRenderer.material != null)
+            {
+                meshRenderer.material.color = Color.white;
+                yield return new WaitForSeconds(flashDuration / 6);
+                meshRenderer.material.color = originalColor;
+                yield return new WaitForSeconds(flashDuration / 6);
+            }
+        }
+    }
+
+    public bool CanMergeWith(Shooter other)
+    {
+        if (shooterType == null || other.shooterType == null)
+            return false;
+
+        // Kiểm tra xem có thể merge không
+        if (!shooterType.CanMerge() || !other.shooterType.CanMerge())
+            return false;
+
+        // Kiểm tra màu sắc (chỉ merge khi đã reveal)
+        if (shooterType.specialType == ShooterSpecialType.Secret && !isRevealed)
+            return false;
+
+        if (other.shooterType.specialType == ShooterSpecialType.Secret && !other.isRevealed)
+            return false;
+
+        return ColorsMatch(shooterColor, other.shooterColor);
     }
 
     public void AutoFire(BlockGridManager blockGrid)
     {
+        // Không cần reveal ở đây nữa vì đã reveal khi ở hàng đầu tiên
         if (!isFiring && ammo > 0)
         {
             StartCoroutine(BurstFireCoroutine(blockGrid));
@@ -50,11 +199,10 @@ public class Shooter : MonoBehaviour
     private IEnumerator BurstFireCoroutine(BlockGridManager blockGrid)
     {
         isFiring = true;
-        Debug.Log($"Burst fire started! Ammo: {ammo}, Shooter Color: {shooterColor}");
+        Debug.Log($"Burst fire started! Ammo: {ammo}, Shooter Color: {shooterColor}, Type: {shooterType.specialType}");
 
         while (ammo > 0)
         {
-            // Tìm block đầu tiên từ trái qua phải
             Block currentTarget = FindNextTarget(blockGrid);
 
             if (currentTarget == null)
@@ -65,14 +213,10 @@ public class Shooter : MonoBehaviour
 
             Debug.Log($"Found target block with {currentTarget.floor} floors. Firing burst!");
 
-            // Tính số đạn cần bắn cho block này
             int bulletsNeeded = currentTarget.floor;
             int bulletsToFire = Mathf.Min(bulletsNeeded, ammo);
 
-            // **BẮN BURST - tất cả đạn gần như cùng lúc**
             yield return StartCoroutine(FireBurst(currentTarget, bulletsToFire));
-
-            // Chờ để tất cả đạn trong burst hit target
             yield return new WaitForSeconds(burstDelay);
 
             Debug.Log($"Burst completed. Ammo left: {ammo}");
@@ -86,15 +230,13 @@ public class Shooter : MonoBehaviour
     {
         Debug.Log($"Firing burst of {bulletCount} bullets!");
 
-        // Bắn tất cả đạn với delay rất ngắn
         for (int i = 0; i < bulletCount; i++)
         {
             if (target == null || ammo <= 0 || target.floor <= 0) break;
 
             FireBulletAtTarget(target);
 
-            // Delay rất ngắn giữa các viên đạn (tạo hiệu ứng burst)
-            if (i < bulletCount - 1) // Không delay sau viên đạn cuối
+            if (i < bulletCount - 1)
             {
                 yield return new WaitForSeconds(shotDelay);
             }
@@ -106,10 +248,8 @@ public class Shooter : MonoBehaviour
         int width = blockGrid.width;
         int height = blockGrid.height;
 
-        // Quét từ trái qua phải (x = 0 -> width-1)
         for (int x = 0; x < width; x++)
         {
-            // Trong mỗi cột, tìm block đầu tiên từ dưới lên trên (y = 0 -> height-1)
             for (int y = 0; y < height; y++)
             {
                 Transform targetTransform = blockGrid.GetObjectAt(x, y);
@@ -118,22 +258,20 @@ public class Shooter : MonoBehaviour
                 Block block = targetTransform.GetComponent<Block>();
                 if (block != null && block.floor > 0)
                 {
-                    // Kiểm tra màu sắc có khớp không
                     if (ColorsMatch(block.blockColor, shooterColor))
                     {
                         Debug.Log($"Found target block at column {x}, row {y} with {block.floor} floors");
-                        return block; // Trả về block đầu tiên tìm thấy
+                        return block;
                     }
                     else
                     {
-                        // Nếu gặp block khác màu, dừng tìm kiếm trong cột này
                         break;
                     }
                 }
             }
         }
 
-        return null; // Không tìm thấy target nào
+        return null;
     }
 
     private void FireBulletAtTarget(Block target)
@@ -149,7 +287,6 @@ public class Shooter : MonoBehaviour
         }
         else
         {
-            // Nếu không có Bullet component, destroy object
             Destroy(bulletObj);
         }
     }
@@ -166,7 +303,15 @@ public class Shooter : MonoBehaviour
     {
         if (ammoText != null)
         {
-            ammoText.text = ammo.ToString();
+            // Ẩn ammo text cho Secret Shooter chưa reveal
+            if (shooterType != null && shooterType.specialType == ShooterSpecialType.Secret && !isRevealed)
+            {
+                ammoText.text = "?";
+            }
+            else
+            {
+                ammoText.text = ammo.ToString();
+            }
         }
     }
 
@@ -183,4 +328,9 @@ public class Shooter : MonoBehaviour
 
     public bool IsOutOfAmmo => ammo <= 0;
     public bool IsCurrentlyFiring => isFiring;
+
+    // Properties để truy cập thông tin special type
+    public bool IsSecretShooter => shooterType != null && shooterType.specialType == ShooterSpecialType.Secret;
+    public bool IsDoubleShooter => shooterType != null && shooterType.specialType == ShooterSpecialType.Double;
+    public bool IsNormalShooter => shooterType != null && shooterType.specialType == ShooterSpecialType.Normal;
 }
