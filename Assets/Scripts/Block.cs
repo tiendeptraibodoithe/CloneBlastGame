@@ -11,6 +11,10 @@ public class Block : MonoBehaviour
 
     private bool isBeingHit = false;
 
+    public bool isLocked = false; // Block có đang bị khóa không
+    public int unlockAfterShooterCount = 12; // Số block cần ăn để mở khóa (có thể set khi spawn)
+    private int shooterProgress = 0; // Số block đã ăn để mở khóa
+
     void Start()
     {
         GenerateSubBlocks();
@@ -34,8 +38,40 @@ public class Block : MonoBehaviour
         }
     }
 
+    // Khóa block, truyền vào số lượng block cần ăn để mở khóa
+    public void LockBlock(int unlockCount)
+    {
+        isLocked = true;
+        unlockAfterShooterCount = unlockCount;
+        shooterProgress = 0;
+    }
+
+    // Gọi hàm này mỗi khi shooter ăn được 1 block (từ GameController)
+    public void ShooterCollectedBlock()
+    {
+        if (!isLocked) return;
+
+        shooterProgress++;
+        if (shooterProgress >= unlockAfterShooterCount)
+        {
+            UnlockBlock();
+        }
+    }
+
+    // Mở khóa block
+    public void UnlockBlock()
+    {
+        isLocked = false;
+        Debug.Log("Block đã được mở khóa!");
+    }
     public void Hit()
     {
+        if (isLocked) // Nếu block bị khóa thì không cho bắn
+        {
+            Debug.Log("Block đang bị đóng băng/khóa, không thể bắn!");
+            return;
+        }
+
         floor--;
         Debug.Log($"Block hit! Floor remaining: {floor}");
         UpdateVisual();
@@ -43,7 +79,7 @@ public class Block : MonoBehaviour
 
     public bool TryHit()
     {
-        if (isBeingHit || floor <= 0) return false;
+        if (isLocked || isBeingHit || floor <= 0) return false;
 
         isBeingHit = true;
 

@@ -258,6 +258,13 @@ public class Shooter : MonoBehaviour
                 Block block = targetTransform.GetComponent<Block>();
                 if (block != null && block.floor > 0)
                 {
+                    // 🚫 Bỏ qua block bị khóa
+                    if (block.isLocked)
+                    {
+                        Debug.Log($"Skipping locked block at {x},{y}");
+                        continue;
+                    }
+
                     if (ColorsMatch(block.blockColor, shooterColor))
                     {
                         Debug.Log($"Found target block at column {x}, row {y} with {block.floor} floors");
@@ -265,7 +272,7 @@ public class Shooter : MonoBehaviour
                     }
                     else
                     {
-                        break;
+                        break; // dừng tìm ở cột này nếu màu không khớp
                     }
                 }
             }
@@ -273,6 +280,7 @@ public class Shooter : MonoBehaviour
 
         return null;
     }
+
 
     private void FireBulletAtTarget(Block target)
     {
