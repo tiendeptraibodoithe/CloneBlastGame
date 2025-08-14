@@ -22,6 +22,9 @@ public class GameController : MonoBehaviour
     public Transform[] shooterSelectionSlots = new Transform[5]; // Gán vị trí ô trên cùng trong Editor
     private List<GameObject> selectedShooters = new List<GameObject>();
 
+    public int totalBlocksEaten = 0;
+    private List<Block> frozenBlocks = new List<Block>();
+
     void Start()
     {
         string sceneName = SceneManager.GetActiveScene().name;
@@ -77,13 +80,41 @@ public class GameController : MonoBehaviour
             string[] tokens = lines[y].Trim().Split(' ');
             for (int x = 0; x < tokens.Length; x++)
             {
-                if (int.TryParse(tokens[x], out int id) && id >= 0 && id < blockTypeMapping.Count)
+                string token = tokens[x];
+                int id = -1;
+                int? lockCount = null;
+
+                // Kiểm tra cú pháp dạng 3(1)
+                if (token.Contains("(") && token.Contains(")"))
                 {
-                    int gridY = (lines.Length - 1) - y; // đảo chiều nếu grid của bạn vẽ từ dưới lên
+                    int leftParen = token.IndexOf('(');
+                    int rightParen = token.IndexOf(')');
+                    string idStr = token.Substring(0, leftParen);
+                    string lockStr = token.Substring(leftParen + 1, rightParen - leftParen - 1);
+
+                    if (int.TryParse(idStr, out id) && int.TryParse(lockStr, out int lockVal))
+                    {
+                        lockCount = lockVal;
+                    }
+                }
+                else
+                {
+                    int.TryParse(token, out id);
+                }
+
+                if (id >= 0 && id < blockTypeMapping.Count)
+                {
+                    int gridY = (lines.Length - 1) - y;
                     BlockType type = blockTypeMapping[id];
                     if (type != null)
                     {
-                        blockGrid.SpawnBlock(x, gridY, type);
+                        Block spawnedBlock = blockGrid.SpawnBlock(x, gridY, type);
+
+                        // Nếu có lockCount thì khóa block này
+                        if (lockCount.HasValue && spawnedBlock != null)
+                        {
+                            spawnedBlock.LockBlock(lockCount.Value);
+                        }
                     }
                 }
             }
@@ -327,6 +358,26 @@ public class GameController : MonoBehaviour
         }
     }
 
+    public void OnBlockEaten(Block block)
+    {
+        totalBlocksEaten++;
+
+        // Nếu block này bị đóng băng, thêm vào danh sách (nếu chưa có)
+        if (block.isLocked && !frozenBlocks.Contains(block))
+        {
+            frozenBlocks.Add(block);
+        }
+
+        // Kiểm tra mở khóa các block bị đóng băng
+        foreach (var frozenBlock in frozenBlocks.ToList())
+        {
+            if (totalBlocksEaten >= frozenBlock.unlockAfterShooterCount)
+            {
+                frozenBlock.UnlockBlock();
+                frozenBlocks.Remove(frozenBlock);
+            }
+        }
+    }
 
     public void RecheckAllSelectedShooters()
     {

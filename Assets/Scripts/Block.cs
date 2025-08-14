@@ -1,5 +1,4 @@
-﻿// 1. Sửa Block.cs - Di chuyển Destroy() xuống cuối
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 
 public class Block : MonoBehaviour
@@ -116,9 +115,11 @@ public class Block : MonoBehaviour
 
     private void UpdateFrozenVisual()
     {
+        Debug.Log($"UpdateFrozenVisual called for {gameObject.name}: isFrozen={isFrozen}, subBlocks count={subBlocks.Count}");
+
         if (isFrozen)
         {
-            // Làm mờ màu để hiển thị frozen
+            // Làm mờ màu để hiển thị frozen - thử nhiều cách
             foreach (GameObject subBlock in subBlocks)
             {
                 if (subBlock != null)
@@ -126,9 +127,23 @@ public class Block : MonoBehaviour
                     Renderer r = subBlock.GetComponent<Renderer>();
                     if (r != null)
                     {
+                        // Cách 1: Thay đổi alpha (nếu shader hỗ trợ)
+                        Color frozenColor = blockColor;
+                        frozenColor.a = 0.5f;
+                        r.material.color = frozenColor;
+
+                        // Cách 2: Làm tối màu thay vì làm mờ
                         Color darkColor = blockColor * 0.5f; // Làm tối 50%
                         darkColor.a = 1f; // Giữ alpha = 1
                         r.material.color = darkColor;
+
+                        // Cách 3: Thêm tint màu xanh lạnh
+                        Color frozenTint = Color.Lerp(blockColor, Color.cyan, 0.3f);
+                        frozenTint = frozenTint * 0.7f; // Làm tối một chút
+                        frozenTint.a = 1f;
+                        r.material.color = frozenTint;
+
+                        Debug.Log($"Applied frozen visual to {subBlock.name}: {r.material.color}");
                     }
                 }
             }
@@ -144,6 +159,7 @@ public class Block : MonoBehaviour
                     if (r != null)
                     {
                         r.material.color = blockColor;
+                        Debug.Log($"Restored original color to {subBlock.name}: {blockColor}");
                     }
                 }
             }

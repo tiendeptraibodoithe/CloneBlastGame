@@ -51,20 +51,27 @@ public class BlockGridManager : GridManager
     }
 
 
-    public void SpawnBlock(int x, int y, BlockType type)
+    public Block SpawnBlock(int x, int y, BlockType type)
     {
         GameObject block = Instantiate(type.prefab, GetWorldPosition(x, y), Quaternion.identity);
         Block blockComponent = block.GetComponent<Block>();
         if (blockComponent == null)
         {
             Debug.LogError("Prefab không có component Block.");
-            return;
+            return null;
         }
 
         // Gọi hàm khởi tạo đầy đủ, sẽ set cả freeze + subBlock + floor
         blockComponent.Initialize(type);
 
+        // Nếu blockType bị đóng băng, khóa block lại
+        if (type.isFrozen)
+        {
+            blockComponent.LockBlock(type.unlockAfterShooterCount);
+        }
+
         PlaceObject(x, y, block.transform);
+        return blockComponent;
     }
 
 
