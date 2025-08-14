@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   typeName: 
   color: {r: 0.019607844, g: 0.78431374, b: 0, a: 1}
-  prefab: {fileID: 8383960319631651619, guid: ce79499e727b7c842a39decfd23ffc0e, type: 3}
+  prefab: {fileID: 8383960319631651619, guid: 82095e7f7885ff749aaf0a17e5e15ef8, type: 3}
   baseAmmo: 20
   specialType: 2
   hiddenColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}

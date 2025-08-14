@@ -57,7 +57,7 @@ public class GameController : MonoBehaviour
         }
     }
 
-
+    
     public void LoadLevelFromText(string fileName)
     {
         TextAsset levelData = Resources.Load<TextAsset>("Levels/" + fileName);

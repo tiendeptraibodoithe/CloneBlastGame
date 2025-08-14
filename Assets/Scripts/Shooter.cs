@@ -256,17 +256,26 @@ public class Shooter : MonoBehaviour
                 if (targetTransform == null) continue;
 
                 Block block = targetTransform.GetComponent<Block>();
-                if (block != null && block.floor > 0)
+                if (block == null) continue;
+
+                // Nếu gặp frozen block, dừng tìm kiếm trong cột này
+                if (block.isFrozen)
                 {
-                    if (ColorsMatch(block.blockColor, shooterColor))
-                    {
-                        Debug.Log($"Found target block at column {x}, row {y} with {block.floor} floors");
-                        return block;
-                    }
-                    else
-                    {
-                        break;
-                    }
+                    Debug.Log($"Found frozen block at column {x}, row {y} - stopping search in this column");
+                    break; // Dừng tìm kiếm trong cột này
+                }
+
+                // Nếu block có thể bắn và cùng màu
+                if (block.CanBeHit && ColorsMatch(block.blockColor, shooterColor))
+                {
+                    Debug.Log($"Found target block at column {x}, row {y} with {block.floor} floors");
+                    return block;
+                }
+
+                // Nếu gặp block khác màu (không frozen), cũng dừng tìm kiếm trong cột này
+                if (!ColorsMatch(block.blockColor, shooterColor))
+                {
+                    break;
                 }
             }
         }

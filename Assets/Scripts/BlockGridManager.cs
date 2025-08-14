@@ -55,22 +55,18 @@ public class BlockGridManager : GridManager
     {
         GameObject block = Instantiate(type.prefab, GetWorldPosition(x, y), Quaternion.identity);
         Block blockComponent = block.GetComponent<Block>();
-
         if (blockComponent == null)
         {
             Debug.LogError("Prefab không có component Block.");
             return;
         }
 
-        blockComponent.blockColor = type.color;
-        blockComponent.floor = type.startingFloor;
-
-        // Gán prefab subblock nếu bạn để trong BlockType
-        if (type.subBlockPrefab != null)
-            blockComponent.subBlockPrefab = type.subBlockPrefab;
+        // Gọi hàm khởi tạo đầy đủ, sẽ set cả freeze + subBlock + floor
+        blockComponent.Initialize(type);
 
         PlaceObject(x, y, block.transform);
     }
+
 
     public void PlaceObject(int x, int y, Transform obj)
     {
