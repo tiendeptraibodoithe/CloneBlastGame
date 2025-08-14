@@ -3,7 +3,10 @@ guid: 3808bd682f7989044b8b7217f99f8eaf
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2
-  defaultReferences: []
+  defaultReferences:
+  - subBlockPrefab: {instanceID: 0}
+  - hitSound: {fileID: 8300000, guid: 147645d00f771574e9aba86bbd28836f, type: 3}
+  - breakSound: {fileID: 8300000, guid: 147645d00f771574e9aba86bbd28836f, type: 3}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 

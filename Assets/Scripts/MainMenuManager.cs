@@ -9,6 +9,7 @@ public class MainMenuManager : MonoBehaviour
 {
     public GameObject mainMenuPanel;
     public GameObject settingPanel;
+    public GameObject selectLevelPanel; // Panel chọn level
 
     [Header("Âm thanh")]
     public Slider volumeSlider;
@@ -21,18 +22,37 @@ public class MainMenuManager : MonoBehaviour
         {
             volumeSlider.onValueChanged.AddListener(SetVolume);
 
-            // Đặt giá trị khởi đầu (ví dụ: 0.5)
             float defaultVolume = PlayerPrefs.GetFloat("volume", 0.5f);
             volumeSlider.value = defaultVolume;
             SetVolume(defaultVolume);
         }
+
+        // Ẩn panel level lúc khởi động
+        if (selectLevelPanel != null) selectLevelPanel.SetActive(false);
+        if (settingPanel != null) settingPanel.SetActive(false);
     }
 
-    // Hàm bắt đầu game
+    // Khi bấm nút Play
     public void PlayGame()
     {
-        SceneManager.LoadScene("Level1");
+        mainMenuPanel.SetActive(false);
+        selectLevelPanel.SetActive(true);
     }
+
+    // Chọn Level bất kỳ
+    public void SelectLevel(int levelNumber)
+    {
+        string sceneName = "Level" + levelNumber;
+        SceneManager.LoadScene(sceneName);
+    }
+
+    // Quay lại từ SelectLevelPanel
+    public void BackFromSelectLevel()
+    {
+        if (selectLevelPanel != null) selectLevelPanel.SetActive(false); // Ẩn panel chọn level
+        if (mainMenuPanel != null) mainMenuPanel.SetActive(true);       // Hiện panel menu chính
+    }
+
 
     // Hiện menu cài đặt
     public void OpenSetting()
@@ -41,7 +61,7 @@ public class MainMenuManager : MonoBehaviour
         settingPanel.SetActive(true);
     }
 
-    // Quay lại menu chính
+    // Quay lại menu chính từ Setting
     public void BackToMainMenu()
     {
         settingPanel.SetActive(false);
@@ -52,7 +72,6 @@ public class MainMenuManager : MonoBehaviour
     public void QuitGame()
     {
         Application.Quit();
-
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
 #endif
@@ -61,9 +80,8 @@ public class MainMenuManager : MonoBehaviour
     // Hàm chỉnh âm lượng
     public void SetVolume(float volume)
     {
-        // Tránh lỗi Log10(0)
         float volumeDB = Mathf.Log10(Mathf.Clamp(volume, 0.0001f, 1f)) * 20f;
         audioMixer.SetFloat("Volume", volumeDB);
-        PlayerPrefs.SetFloat("volume", volume); // Lưu lại nếu cần
+        PlayerPrefs.SetFloat("volume", volume);
     }
 }

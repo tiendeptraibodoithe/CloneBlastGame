@@ -1,5 +1,4 @@
-﻿// 1. Sửa Block.cs - Di chuyển Destroy() xuống cuối
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 
 public class Block : MonoBehaviour
@@ -18,8 +17,20 @@ public class Block : MonoBehaviour
     public static int totalBlocksDestroyed = 0;
     private BlockType blockType;
 
+    [Header("Sound Effects")]
+    public AudioClip breakSound;   // Âm thanh khi block bị phá
+    private static AudioSource sharedAudioSource; // AudioSource toàn cục dùng chung
+
     void Start()
     {
+        // Khởi tạo AudioSource toàn cục nếu chưa có
+        if (sharedAudioSource == null)
+        {
+            GameObject audioObj = new GameObject("SharedBlockAudioSource");
+            sharedAudioSource = audioObj.AddComponent<AudioSource>();
+            sharedAudioSource.playOnAwake = false;
+            DontDestroyOnLoad(audioObj);
+        }
     }
 
     public void Initialize(BlockType type)
@@ -155,6 +166,12 @@ public class Block : MonoBehaviour
         // QUAN TRỌNG: Thực hiện logic unfreeze TRƯỚC khi destroy
         totalBlocksDestroyed++;
         Debug.Log($"Total blocks destroyed: {totalBlocksDestroyed}");
+
+        // 🔊 Phát âm thanh từ AudioSource toàn cục
+        if (breakSound != null && sharedAudioSource != null)
+        {
+            sharedAudioSource.PlayOneShot(breakSound);
+        }
 
         // Kiểm tra tất cả block frozen TRƯỚC KHI destroy block này
         foreach (Block block in FindObjectsOfType<Block>())

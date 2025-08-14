@@ -74,7 +74,18 @@ public class Shooter : MonoBehaviour
     public void SetType(ShooterType type)
     {
         shooterType = type;
-        shooterColor = type.color;
+
+        // Chỉ set shooterColor cho những shooter đã reveal hoặc không phải secret
+        if (type.specialType != ShooterSpecialType.Secret || isRevealed)
+        {
+            shooterColor = type.color;
+        }
+        else
+        {
+            // Với secret shooter chưa reveal, giữ màu ẩn
+            shooterColor = type.hiddenColor;
+        }
+
         ammo = type.GetActualAmmo();
 
         // Khởi tạo lại materials với type mới
@@ -93,6 +104,8 @@ public class Shooter : MonoBehaviour
         // Kiểm tra xem có cần reveal không (cho trường hợp spawn)
         CheckIfShouldReveal();
         UpdateAmmoText();
+
+        Debug.Log($"SetType called - Type: {type.specialType}, IsRevealed: {isRevealed}, ShooterColor: {shooterColor}");
     }
 
     private void UpdateVisualAppearance()
@@ -135,6 +148,13 @@ public class Shooter : MonoBehaviour
         if (shooterType.specialType == ShooterSpecialType.Secret && !isRevealed)
         {
             isRevealed = true;
+
+            // QUAN TRỌNG: Cập nhật shooterColor từ ShooterType
+            // Vì secret shooter có màu thật khác với màu ẩn
+            shooterColor = shooterType.color; // Đây là dòng quan trọng nhất!
+
+            Debug.Log($"Secret shooter revealed! New color: {shooterColor}");
+
             UpdateVisualAppearance();
             UpdateAmmoText();
 
@@ -177,13 +197,15 @@ public class Shooter : MonoBehaviour
         if (!shooterType.CanMerge() || !other.shooterType.CanMerge())
             return false;
 
-        // Kiểm tra màu sắc (chỉ merge khi đã reveal)
+        // Kiểm tra secret shooter đã reveal chưa (chỉ merge khi đã reveal)
         if (shooterType.specialType == ShooterSpecialType.Secret && !isRevealed)
             return false;
 
         if (other.shooterType.specialType == ShooterSpecialType.Secret && !other.isRevealed)
             return false;
 
+        // So sánh màu sắc thay vì ShooterType
+        // Green Secret Shooter (revealed) có thể merge với Green Normal Shooter
         return ColorsMatch(shooterColor, other.shooterColor);
     }
 

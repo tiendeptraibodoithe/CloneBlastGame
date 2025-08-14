@@ -57,7 +57,7 @@ public class GameController : MonoBehaviour
         }
     }
 
-    
+
     public void LoadLevelFromText(string fileName)
     {
         TextAsset levelData = Resources.Load<TextAsset>("Levels/" + fileName);
@@ -189,18 +189,28 @@ public class GameController : MonoBehaviour
             cloneShooter.isRevealed = originalShooter.isRevealed;
             cloneShooter.gameController = this;
 
-            // Khởi tạo lại visuals cho clone
-            cloneShooter.SetType(originalShooter.shooterType);
+            // QUAN TRỌNG: Reveal secret shooter TRƯỚC khi làm bất cứ việc gì khác
+            if (cloneShooter.IsSecretShooter && !cloneShooter.isRevealed)
+            {
+                cloneShooter.RevealSecretShooter();
+                // Đảm bảo isRevealed được set sau khi reveal
+                cloneShooter.isRevealed = true;
 
-            Debug.Log($"Clone shooter created - Type: {cloneShooter.shooterType.specialType}, Color: {cloneShooter.shooterColor}, Ammo: {cloneShooter.ammo}");
+                Debug.Log($"Secret shooter revealed - New Color: {cloneShooter.shooterColor}");
+            }
 
-            // Auto fire sẽ tự động reveal nếu là secret shooter
+            // Khởi tạo lại visuals cho clone SAU KHI reveal
+            cloneShooter.SetType(cloneShooter.shooterType);
+
+            Debug.Log($"Clone shooter created - Type: {cloneShooter.shooterType.specialType}, Color: {cloneShooter.shooterColor}, Ammo: {cloneShooter.ammo}, IsRevealed: {cloneShooter.isRevealed}");
+
+            // Auto fire SAU KHI đã reveal hoàn toàn
             cloneShooter.AutoFire(blockGrid);
         }
 
         selectedShooters.Add(shooterClone);
 
-        // Thử merge sau khi thêm shooter mới
+        // Thử merge SAU KHI shooter đã được xử lý hoàn toàn
         TryMergeSelectedShooters();
 
         // Xóa shooter khỏi grid và di chuyển các shooter phía dưới lên
@@ -239,22 +249,56 @@ public class GameController : MonoBehaviour
             return;
         }
 
-        // Nhóm theo màu sắc
-        var colorGroups = mergeableShooters.GroupBy(s => s.shooterColor);
+        // Tạo dictionary để nhóm shooter theo màu sắc (không phân biệt type)
+        Dictionary<Color, List<Shooter>> colorGroups = new Dictionary<Color, List<Shooter>>();
+
+        foreach (var shooter in mergeableShooters)
+        {
+            Color shooterColor = shooter.shooterColor;
+
+            // Tìm xem có màu nào tương tự không (dùng tolerance)
+            Color matchingColor = Color.clear;
+            foreach (var existingColor in colorGroups.Keys)
+            {
+                if (ColorsMatch(existingColor, shooterColor))
+                {
+                    matchingColor = existingColor;
+                    break;
+                }
+            }
+
+            if (matchingColor != Color.clear)
+            {
+                // Thêm vào nhóm màu đã có
+                colorGroups[matchingColor].Add(shooter);
+            }
+            else
+            {
+                // Tạo nhóm màu mới
+                colorGroups[shooterColor] = new List<Shooter> { shooter };
+            }
+        }
 
         foreach (var group in colorGroups)
         {
-            var shootersOfColor = group.ToList();
+            var shootersOfColor = group.Value;
+            Color groupColor = group.Key;
+
+            Debug.Log($"Color group {groupColor} has {shootersOfColor.Count} shooters:");
+            foreach (var shooter in shootersOfColor)
+            {
+                Debug.Log($"  - {shooter.shooterType.name} (Type: {shooter.shooterType.specialType}, Color: {shooter.shooterColor})");
+            }
 
             if (shootersOfColor.Count >= 3)
             {
-                // Lấy 3 shooter đầu tiên cùng màu
+                // Lấy 3 shooter đầu tiên cùng màu (có thể khác type)
                 Shooter s1 = shootersOfColor[0];
                 Shooter s2 = shootersOfColor[1];
                 Shooter s3 = shootersOfColor[2];
 
-                // Kiểm tra tất cả đều có thể merge
-                if (!s1.CanMergeWith(s2) || !s2.CanMergeWith(s3) || !s1.CanMergeWith(s3))
+                // Kiểm tra tất cả đều có thể merge (dựa trên màu, không cần cùng type)
+                if (!CanMergeByColor(s1, s2) || !CanMergeByColor(s2, s3) || !CanMergeByColor(s1, s3))
                 {
                     Debug.Log("Một số shooter không thể merge với nhau");
                     continue;
@@ -262,16 +306,28 @@ public class GameController : MonoBehaviour
 
                 // Tính tổng ammo
                 int totalAmmo = s1.ammo + s2.ammo + s3.ammo;
-                Color mergedColor = group.Key;
 
-                // Tìm ShooterType hợp nhất tương ứng
+                Debug.Log($"Trying to merge color group: {groupColor}");
+
+                // Tìm ShooterType hợp nhất tương ứng bằng màu sắc
                 ShooterType mergedType = mergedShooterTypes
-                    .FirstOrDefault(t => t.color == mergedColor);
+                    .FirstOrDefault(t => ColorsMatch(t.color, groupColor));
 
                 if (mergedType == null)
                 {
-                    Debug.LogError($"Không tìm thấy merged type cho màu: {mergedColor}");
-                    return;
+                    Debug.LogError($"Không tìm thấy merged type cho màu: {groupColor}");
+
+                    // Debug thêm thông tin về các merged types có sẵn
+                    Debug.Log("Available merged types:");
+                    for (int i = 0; i < mergedShooterTypes.Count; i++)
+                    {
+                        if (mergedShooterTypes[i] != null)
+                        {
+                            Debug.Log($"  [{i}]: {mergedShooterTypes[i].name} - Color: {mergedShooterTypes[i].color}");
+                        }
+                    }
+
+                    continue;
                 }
 
                 // Tìm vị trí slot của shooter giữa
@@ -289,8 +345,10 @@ public class GameController : MonoBehaviour
                 if (middleIndex == -1)
                 {
                     Debug.LogError("Không tìm thấy vị trí giữa để đặt shooter hợp nhất.");
-                    return;
+                    continue;
                 }
+
+                Debug.Log($"Merging 3 shooters: {s1.shooterType.name}, {s2.shooterType.name}, {s3.shooterType.name}");
 
                 // Xóa 3 shooter cũ
                 Destroy(s1.gameObject);
@@ -305,7 +363,7 @@ public class GameController : MonoBehaviour
                 mergedShooter.transform.localPosition = Vector3.zero;
 
                 Shooter shooterComponent = mergedShooter.GetComponent<Shooter>();
-                shooterComponent.shooterColor = mergedColor;
+                shooterComponent.shooterColor = groupColor;
                 shooterComponent.shooterType = mergedType;
                 shooterComponent.ammo = totalAmmo;
                 shooterComponent.gameController = this;
@@ -320,11 +378,40 @@ public class GameController : MonoBehaviour
                 // Thêm vào danh sách
                 selectedShooters.Add(mergedShooter);
 
-                Debug.Log($"Đã hợp nhất shooter màu {mergedColor} với ammo {totalAmmo}");
+                Debug.Log($"Đã hợp nhất 3 shooter cùng màu {groupColor} thành {mergedType.name} với ammo {totalAmmo}");
 
                 break; // Chỉ merge 1 lần mỗi lần gọi
             }
         }
+    }
+
+    private bool CanMergeByColor(Shooter s1, Shooter s2)
+    {
+        if (s1.shooterType == null || s2.shooterType == null)
+            return false;
+
+        // Kiểm tra xem có thể merge không
+        if (!s1.shooterType.CanMerge() || !s2.shooterType.CanMerge())
+            return false;
+
+        // Kiểm tra secret shooter đã reveal chưa
+        if (s1.IsSecretShooter && !s1.isRevealed)
+            return false;
+
+        if (s2.IsSecretShooter && !s2.isRevealed)
+            return false;
+
+        // So sánh màu sắc
+        return ColorsMatch(s1.shooterColor, s2.shooterColor);
+    }
+
+    // Helper method so sánh màu với tolerance
+    private bool ColorsMatch(Color color1, Color color2)
+    {
+        float tolerance = 0.01f;
+        return Mathf.Abs(color1.r - color2.r) < tolerance &&
+               Mathf.Abs(color1.g - color2.g) < tolerance &&
+               Mathf.Abs(color1.b - color2.b) < tolerance;
     }
 
 
