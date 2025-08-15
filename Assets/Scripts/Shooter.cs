@@ -330,7 +330,7 @@ public class Shooter : MonoBehaviour
                Mathf.Abs(color1.b - color2.b) < tolerance;
     }
 
-    private void UpdateAmmoText()
+    public void UpdateAmmoText()
     {
         if (ammoText != null)
         {

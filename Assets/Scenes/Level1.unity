@@ -910,6 +910,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 54a03cac63a27574a8b8343e701940ef, type: 2}
   - {fileID: 11400000, guid: fb030d971ba4fd34ebca4ac753ba270b, type: 2}
   - {fileID: 11400000, guid: 6e696332526da934c87bd8d146c1cb7f, type: 2}
+  - {fileID: 11400000, guid: 83fa000b14eda5d4299fc811af0374c5, type: 2}
+  - {fileID: 11400000, guid: 839cd096ed53bc34cbb78aa58745448e, type: 2}
   shooterTypeMapping:
   - {fileID: 11400000, guid: e59d1c1185ef34c4c908ebd09e9b6dd0, type: 2}
   - {fileID: 11400000, guid: b140bd6427fa69546951b770253bae0d, type: 2}

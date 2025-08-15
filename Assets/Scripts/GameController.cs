@@ -371,7 +371,8 @@ public class GameController : MonoBehaviour
 
                 // Set type để cập nhật visuals
                 shooterComponent.SetType(mergedType);
-
+                shooterComponent.ammo = totalAmmo;
+                shooterComponent.UpdateAmmoText();
                 // Auto fire
                 shooterComponent.AutoFire(blockGrid);
 
